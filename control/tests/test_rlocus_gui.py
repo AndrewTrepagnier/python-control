@@ -1,22 +1,19 @@
 """
-Tests for the matplotlib-based root locus GUI.
+Tests for the root locus GUI.
 
-These tests verify the functionality of the interactive root locus plotting
-using matplotlib.
+These tests verify the functionality of the interactive root locus plotting.
 """
 
 import pytest
 import numpy as np
 import control as ct
 
-# Try to import matplotlib, skip tests if not available
 try:
     import matplotlib.pyplot as plt
     MATPLOTLIB_AVAILABLE = True
 except ImportError:
     MATPLOTLIB_AVAILABLE = False
 
-# Try to import the GUI module
 try:
     from control.interactive.rlocus_gui import root_locus_gui, rlocus_gui, RootLocusGUI
     GUI_AVAILABLE = True
@@ -32,9 +29,9 @@ class TestRootLocusGUI:
     def setup_method(self):
         """Set up test systems."""
         s = ct.tf('s')
-        self.sys1 = 1 / (s**2 + 2*s + 1)  # Simple second-order system
-        self.sys2 = (s + 1) / (s**3 + 3*s**2 + 2*s)  # Third-order with zero
-        self.sys3 = 1 / (s**3 + 4*s**2 + 5*s + 2)  # Third-order system
+        self.sys1 = 1 / (s**2 + 2*s + 1)
+        self.sys2 = (s + 1) / (s**3 + 3*s**2 + 2*s)
+        self.sys3 = 1 / (s**3 + 4*s**2 + 5*s + 2)
     
     def test_basic_functionality(self):
         """Test basic root locus GUI creation."""
@@ -45,16 +42,13 @@ class TestRootLocusGUI:
         assert gui.fig is not None
         assert gui.ax is not None
         
-        # Check that the figure has the expected attributes
         assert hasattr(gui.fig, 'canvas')
         assert hasattr(gui.ax, 'get_title')
-        # The title might be empty or set by the root locus plotting function
         title = gui.ax.get_title()
         assert title == "Root Locus" or title == "" or "Root Locus" in title
     
     def test_siso_requirement(self):
         """Test that non-SISO systems raise an error."""
-        # Create a MIMO system using state space
         mimo_sys = ct.tf([[[1]], [[1]]], [[[1, 1]], [[1, 2]]])
         
         with pytest.raises(ValueError, match="System must be single-input single-output"):
@@ -62,21 +56,17 @@ class TestRootLocusGUI:
     
     def test_grid_options(self):
         """Test grid display options."""
-        # Test with grid
         gui_with_grid = root_locus_gui(self.sys1, grid=True, show_grid_lines=True)
         assert isinstance(gui_with_grid, RootLocusGUI)
         
-        # Test without grid
         gui_no_grid = root_locus_gui(self.sys1, grid=False, show_grid_lines=False)
         assert isinstance(gui_no_grid, RootLocusGUI)
     
     def test_poles_zeros_display(self):
         """Test poles and zeros display options."""
-        # Test with poles and zeros
         gui_with_pz = root_locus_gui(self.sys2, show_poles_zeros=True)
         assert isinstance(gui_with_pz, RootLocusGUI)
         
-        # Test without poles and zeros
         gui_no_pz = root_locus_gui(self.sys2, show_poles_zeros=False)
         assert isinstance(gui_no_pz, RootLocusGUI)
     

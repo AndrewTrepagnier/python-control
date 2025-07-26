@@ -1,10 +1,10 @@
 # Interactive Plotting Tools
 
-This module provides interactive plotting capabilities for the Python Control Systems Library using matplotlib.
+This module provides interactive plotting capabilities for the Python Control Systems Library.
 
 ## Root Locus GUI
 
-The `root_locus_gui` function creates an interactive root locus plot with hover functionality, similar to MATLAB's root locus GUI.
+The `root_locus_gui` function creates an interactive root locus plot with hover functionality.
 
 ### Features
 
@@ -97,20 +97,3 @@ This GUI provides similar functionality to MATLAB's root locus tool:
 ### Comparison with Existing Functionality
 
 The python-control library already has some interactive features:
-
-- **Original click functionality**: `ct.pole_zero_plot(rl_data, interactive=True)` allows clicking to see gain
-- **This GUI adds**: Hover-based interaction (more intuitive) with real-time info box and cursor marker
-
-### Troubleshooting
-
-If you get an ImportError, make sure matplotlib is installed:
-
-```bash
-pip install matplotlib
-```
-
-For Jupyter notebooks, you may need to enable matplotlib rendering:
-
-```python
-%matplotlib inline
-```
