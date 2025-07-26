@@ -35,6 +35,7 @@ additional subpackages and modules are available that provide more
 specialized functionality:
 
 * :mod:`~control.flatsys`: Differentially flat systems
+* :mod:`~control.interactive`: Interactive plotting tools
 * :mod:`~control.matlab`: MATLAB compatibility module
 * :mod:`~control.optimal`: Optimization-based control
 * :mod:`~control.phaseplot`: 2D phase plane diagrams
@@ -86,6 +87,13 @@ from .config import *
 from .sisotool import *
 from .passivity import *
 from .sysnorm import *
+
+# Interactive plotting tools
+try:
+    from .interactive import *
+except ImportError:
+    # Interactive tools may not be available if plotly is not installed
+    pass
 
 # Allow access to phase_plane functions as ct.phaseplot.fcn or ct.pp.fcn
 from . import phaseplot as phaseplot
