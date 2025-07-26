@@ -80,7 +80,12 @@ class RootLocusGUI:
         self.title = title
         self.kwargs = kwargs
         
-        # Get root locus data
+        # Get root locus data with wider limits if not specified
+        if xlim is None and ylim is None:
+            # Use wider default limits to allow the green dot to follow beyond ±1
+            xlim = (-5, 2)  # Wider x range
+            ylim = (-3, 3)  # Wider y range to go beyond ±1
+        
         self.rl_data = root_locus_map(sys, gains=gains, xlim=xlim, ylim=ylim, **kwargs)
         
         # Initialize GUI elements
@@ -88,6 +93,7 @@ class RootLocusGUI:
         self.ax = None
         self.info_text = None
         self.locus_lines = []
+        self.cursor_marker = None  # Green dot that follows the cursor
         
         # Create the plot using the original root locus plotting
         self._create_plot()
@@ -120,6 +126,9 @@ class RootLocusGUI:
         
         # Create info box
         self._create_info_box()
+        
+        # Create cursor marker (initially hidden)
+        self._create_cursor_marker()
     
     def _create_info_box(self):
         """Create the information display box."""
@@ -139,6 +148,23 @@ class RootLocusGUI:
             )
         )
     
+    def _create_cursor_marker(self):
+        """Create the cursor marker (green dot) that follows the mouse."""
+        
+        # Create a small green dot marker that will follow the cursor
+        self.cursor_marker, = self.ax.plot(
+            [], [], 'go',  # Green circle marker
+            markersize=8,
+            markeredgecolor='darkgreen',
+            markeredgewidth=1.5,
+            markerfacecolor='lime',
+            alpha=0.8,
+            zorder=10  # Ensure it's on top of other elements
+        )
+        
+        # Initially hide the marker
+        self.cursor_marker.set_visible(False)
+    
     def _setup_interactivity(self):
         """Set up mouse event handlers."""
         
@@ -152,6 +178,8 @@ class RootLocusGUI:
         """Handle mouse movement events."""
         
         if event.inaxes != self.ax:
+            self._hide_info_box()
+            self._hide_cursor_marker()
             return
         
         # Find the closest point on the root locus
@@ -159,12 +187,15 @@ class RootLocusGUI:
         
         if closest_point is not None:
             self._update_info_box(closest_point, closest_gain)
+            self._update_cursor_marker(closest_point)
         else:
             self._hide_info_box()
+            self._hide_cursor_marker()
     
     def _on_mouse_leave(self, event):
         """Handle mouse leave events."""
         self._hide_info_box()
+        self._hide_cursor_marker()
     
     def _find_closest_point(self, x, y):
         """Find the closest point on the root locus to the given coordinates."""
@@ -175,6 +206,7 @@ class RootLocusGUI:
         min_distance = float('inf')
         closest_point = None
         closest_gain = None
+        closest_indices = None
         
         # Search through all locus points
         for i, gain in enumerate(self.rl_data.gains):
@@ -186,13 +218,71 @@ class RootLocusGUI:
                     min_distance = distance
                     closest_point = s
                     closest_gain = gain
+                    closest_indices = (i, j)
         
-        # Only return if we're close enough (within reasonable distance)
-        # Adjust this threshold based on the plot scale
-        if min_distance < 0.05:  # Smaller threshold for better precision
+        # Use a very large threshold to make the green dot always responsive
+        if min_distance < 10.0:  # Very large threshold for maximum responsiveness
+            # If we found a close point, try to interpolate for smoother movement
+            if closest_indices is not None:
+                interpolated_point, interpolated_gain = self._interpolate_point(x, y, closest_indices)
+                if interpolated_point is not None:
+                    return interpolated_point, interpolated_gain
+            
             return closest_point, closest_gain
         
         return None, None
+    
+    def _interpolate_point(self, x, y, closest_indices):
+        """Interpolate between nearby points for smoother movement."""
+        
+        i, j = closest_indices
+        
+        # Get neighboring points for interpolation
+        neighbors = []
+        gains = []
+        
+        # Check points around the closest point
+        for di in [-1, 0, 1]:
+            for dj in [-1, 0, 1]:
+                ni, nj = i + di, j + dj
+                if (0 <= ni < len(self.rl_data.gains) and 
+                    0 <= nj < self.rl_data.loci.shape[1]):
+                    neighbor = self.rl_data.loci[ni, nj]
+                    if neighbor is not None and not np.isnan(neighbor):
+                        neighbors.append(neighbor)
+                        gains.append(self.rl_data.gains[ni])
+        
+        if len(neighbors) < 2:
+            return None, None
+        
+        # Find the two closest neighbors to the mouse position
+        distances = [np.sqrt((n.real - x)**2 + (n.imag - y)**2) for n in neighbors]
+        sorted_indices = np.argsort(distances)
+        
+        # Get the two closest points
+        p1 = neighbors[sorted_indices[0]]
+        p2 = neighbors[sorted_indices[1]]
+        g1 = gains[sorted_indices[0]]
+        g2 = gains[sorted_indices[1]]
+        
+        # Calculate interpolation weight based on distance
+        d1 = distances[sorted_indices[0]]
+        d2 = distances[sorted_indices[1]]
+        
+        if d1 + d2 == 0:
+            return p1, g1
+        
+        # Weighted interpolation
+        w1 = d2 / (d1 + d2)
+        w2 = d1 / (d1 + d2)
+        
+        # Interpolate the complex point
+        interpolated_point = w1 * p1 + w2 * p2
+        
+        # Interpolate the gain
+        interpolated_gain = w1 * g1 + w2 * g2
+        
+        return interpolated_point, interpolated_gain
     
     def _update_info_box(self, s, gain):
         """Update the information box with current point data."""
@@ -226,6 +316,26 @@ class RootLocusGUI:
         """Hide the information box."""
         
         self.info_text.set_visible(False)
+        self.fig.canvas.draw_idle()
+    
+    def _update_cursor_marker(self, s):
+        """Update the cursor marker position."""
+        
+        if s is None:
+            self._hide_cursor_marker()
+            return
+        
+        # Update the marker position to the closest point on the root locus
+        self.cursor_marker.set_data([s.real], [s.imag])
+        self.cursor_marker.set_visible(True)
+        
+        # Redraw
+        self.fig.canvas.draw_idle()
+    
+    def _hide_cursor_marker(self):
+        """Hide the cursor marker."""
+        
+        self.cursor_marker.set_visible(False)
         self.fig.canvas.draw_idle()
     
     def show(self):

@@ -11,6 +11,7 @@ The `root_locus_gui` function creates an interactive root locus plot with hover 
 - **Hover Information**: Hover over the root locus to see gain, damping ratio, and frequency
 - **Original Plot Style**: Uses the same visual style as the original matplotlib root locus plots
 - **Interactive Info Box**: Small info box in the corner shows real-time information
+- **Cursor Marker**: Green dot follows your mouse to show exactly where you are on the root locus
 - **Poles and Zeros**: Visual display of open-loop poles and zeros
 - **Customizable**: Various options for display and interaction
 
@@ -63,6 +64,8 @@ When you hover over the root locus, you can see:
 - **Damping**: Damping ratio (for complex poles)
 - **Frequency**: Natural frequency (for complex poles)
 
+A green dot marker will appear on the root locus curve to show exactly where your cursor is positioned.
+
 ### Installation
 
 The interactive tools require matplotlib:
@@ -89,13 +92,14 @@ This GUI provides similar functionality to MATLAB's root locus tool:
 | Custom gain ranges | ✓ | ✓ |
 | Desktop application | ✓ | ✓ |
 | Jupyter integration | ✗ | ✓ |
+| Cursor marker | ✗ | ✓ |
 
 ### Comparison with Existing Functionality
 
 The python-control library already has some interactive features:
 
 - **Original click functionality**: `ct.pole_zero_plot(rl_data, interactive=True)` allows clicking to see gain
-- **This GUI adds**: Hover-based interaction (more intuitive) with real-time info box
+- **This GUI adds**: Hover-based interaction (more intuitive) with real-time info box and cursor marker
 
 ### Troubleshooting
 
@@ -109,4 +113,4 @@ For Jupyter notebooks, you may need to enable matplotlib rendering:
 
 ```python
 %matplotlib inline
-``` 
+```

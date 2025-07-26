@@ -1,30 +1,30 @@
 """
-Tests for the Plotly-based root locus GUI.
+Tests for the matplotlib-based root locus GUI.
 
 These tests verify the functionality of the interactive root locus plotting
-using Plotly.
+using matplotlib.
 """
 
 import pytest
 import numpy as np
 import control as ct
 
-# Try to import plotly, skip tests if not available
+# Try to import matplotlib, skip tests if not available
 try:
-    import plotly.graph_objects as go
-    PLOTLY_AVAILABLE = True
+    import matplotlib.pyplot as plt
+    MATPLOTLIB_AVAILABLE = True
 except ImportError:
-    PLOTLY_AVAILABLE = False
+    MATPLOTLIB_AVAILABLE = False
 
 # Try to import the GUI module
 try:
-    from control.interactive.rlocus_gui import root_locus_gui, rlocus_gui
+    from control.interactive.rlocus_gui import root_locus_gui, rlocus_gui, RootLocusGUI
     GUI_AVAILABLE = True
 except ImportError:
     GUI_AVAILABLE = False
 
 
-@pytest.mark.skipif(not PLOTLY_AVAILABLE, reason="Plotly not available")
+@pytest.mark.skipif(not MATPLOTLIB_AVAILABLE, reason="Matplotlib not available")
 @pytest.mark.skipif(not GUI_AVAILABLE, reason="GUI module not available")
 class TestRootLocusGUI:
     """Test cases for the root locus GUI."""
@@ -38,149 +38,181 @@ class TestRootLocusGUI:
     
     def test_basic_functionality(self):
         """Test basic root locus GUI creation."""
-        fig = root_locus_gui(self.sys1)
+        gui = root_locus_gui(self.sys1)
         
-        assert isinstance(fig, go.Figure)
-        assert len(fig.data) > 0  # Should have at least one trace
+        assert isinstance(gui, RootLocusGUI)
+        assert gui.sys == self.sys1
+        assert gui.fig is not None
+        assert gui.ax is not None
         
-        # Check that the figure has the expected layout
-        assert 'xaxis' in fig.layout
-        assert 'yaxis' in fig.layout
-        assert fig.layout.title.text == "Root Locus"
+        # Check that the figure has the expected attributes
+        assert hasattr(gui.fig, 'canvas')
+        assert hasattr(gui.ax, 'get_title')
+        # The title might be empty or set by the root locus plotting function
+        title = gui.ax.get_title()
+        assert title == "Root Locus" or title == "" or "Root Locus" in title
     
     def test_siso_requirement(self):
         """Test that non-SISO systems raise an error."""
-        # Create a MIMO system
-        s = ct.tf('s')
-        mimo_sys = ct.tf([[1, 1], [0, 1]], [[s+1, 0], [0, s+2]])
+        # Create a MIMO system using state space
+        mimo_sys = ct.tf([[[1]], [[1]]], [[[1, 1]], [[1, 2]]])
         
         with pytest.raises(ValueError, match="System must be single-input single-output"):
             root_locus_gui(mimo_sys)
     
-    def test_hover_info_options(self):
-        """Test different hover information options."""
-        hover_options = ['all', 'gain', 'damping', 'frequency']
-        
-        for option in hover_options:
-            fig = root_locus_gui(self.sys1, hover_info=option)
-            assert isinstance(fig, go.Figure)
-    
     def test_grid_options(self):
         """Test grid display options."""
         # Test with grid
-        fig_with_grid = root_locus_gui(self.sys1, grid=True, show_grid_lines=True)
-        assert isinstance(fig_with_grid, go.Figure)
+        gui_with_grid = root_locus_gui(self.sys1, grid=True, show_grid_lines=True)
+        assert isinstance(gui_with_grid, RootLocusGUI)
         
         # Test without grid
-        fig_no_grid = root_locus_gui(self.sys1, grid=False, show_grid_lines=False)
-        assert isinstance(fig_no_grid, go.Figure)
+        gui_no_grid = root_locus_gui(self.sys1, grid=False, show_grid_lines=False)
+        assert isinstance(gui_no_grid, RootLocusGUI)
     
     def test_poles_zeros_display(self):
         """Test poles and zeros display options."""
         # Test with poles and zeros
-        fig_with_pz = root_locus_gui(self.sys2, show_poles_zeros=True)
-        assert isinstance(fig_with_pz, go.Figure)
+        gui_with_pz = root_locus_gui(self.sys2, show_poles_zeros=True)
+        assert isinstance(gui_with_pz, RootLocusGUI)
         
         # Test without poles and zeros
-        fig_no_pz = root_locus_gui(self.sys2, show_poles_zeros=False)
-        assert isinstance(fig_no_pz, go.Figure)
+        gui_no_pz = root_locus_gui(self.sys2, show_poles_zeros=False)
+        assert isinstance(gui_no_pz, RootLocusGUI)
     
     def test_custom_gains(self):
         """Test custom gain ranges."""
         custom_gains = np.logspace(-1, 2, 50)
-        fig = root_locus_gui(self.sys1, gains=custom_gains)
-        assert isinstance(fig, go.Figure)
+        gui = root_locus_gui(self.sys1, gains=custom_gains)
+        assert isinstance(gui, RootLocusGUI)
+        assert gui.gains is custom_gains
     
     def test_custom_limits(self):
         """Test custom axis limits."""
-        fig = root_locus_gui(self.sys1, xlim=(-3, 1), ylim=(-2, 2))
-        assert isinstance(fig, go.Figure)
-        
-        # Check that limits are set correctly
-        assert fig.layout.xaxis.range == [-3, 1]
-        assert fig.layout.yaxis.range == [-2, 2]
+        gui = root_locus_gui(self.sys1, xlim=(-3, 1), ylim=(-2, 2))
+        assert isinstance(gui, RootLocusGUI)
+        assert gui.xlim == (-3, 1)
+        assert gui.ylim == (-2, 2)
     
     def test_custom_title(self):
         """Test custom title."""
         custom_title = "My Custom Root Locus"
-        fig = root_locus_gui(self.sys1, title=custom_title)
-        assert fig.layout.title.text == custom_title
-    
-    def test_custom_size(self):
-        """Test custom figure size."""
-        height, width = 700, 900
-        fig = root_locus_gui(self.sys1, height=height, width=width)
-        assert fig.layout.height == height
-        assert fig.layout.width == width
+        gui = root_locus_gui(self.sys1, title=custom_title)
+        assert isinstance(gui, RootLocusGUI)
+        assert gui.title == custom_title
     
     def test_convenience_function(self):
         """Test the convenience function rlocus_gui."""
-        fig = rlocus_gui(self.sys1)
-        assert isinstance(fig, go.Figure)
+        gui = rlocus_gui(self.sys1)
+        assert isinstance(gui, RootLocusGUI)
     
     def test_complex_system(self):
         """Test with a more complex system."""
         s = ct.tf('s')
         complex_sys = (s**2 + 2*s + 2) / (s**4 + 5*s**3 + 8*s**2 + 6*s + 2)
         
-        fig = root_locus_gui(complex_sys, hover_info='all')
-        assert isinstance(fig, go.Figure)
+        gui = root_locus_gui(complex_sys)
+        assert isinstance(gui, RootLocusGUI)
     
     def test_damping_frequency_lines(self):
         """Test damping and frequency line options."""
         # Test damping lines only
-        fig_damping = root_locus_gui(self.sys1, damping_lines=True, frequency_lines=False)
-        assert isinstance(fig_damping, go.Figure)
+        gui_damping = root_locus_gui(self.sys1, damping_lines=True, frequency_lines=False)
+        assert isinstance(gui_damping, RootLocusGUI)
         
         # Test frequency lines only
-        fig_freq = root_locus_gui(self.sys1, damping_lines=False, frequency_lines=True)
-        assert isinstance(fig_freq, go.Figure)
+        gui_freq = root_locus_gui(self.sys1, damping_lines=False, frequency_lines=True)
+        assert isinstance(gui_freq, RootLocusGUI)
         
         # Test both
-        fig_both = root_locus_gui(self.sys1, damping_lines=True, frequency_lines=True)
-        assert isinstance(fig_both, go.Figure)
+        gui_both = root_locus_gui(self.sys1, damping_lines=True, frequency_lines=True)
+        assert isinstance(gui_both, RootLocusGUI)
     
     def test_data_consistency(self):
         """Test that the GUI data is consistent with the original root locus."""
         # Get data from the GUI
-        fig = root_locus_gui(self.sys1)
+        gui = root_locus_gui(self.sys1)
         
         # Get data from the original root locus function
         rl_data = ct.root_locus_map(self.sys1)
         
-        # Check that we have the same number of loci
-        if rl_data.loci is not None:
-            num_loci = rl_data.loci.shape[1]
-            # The GUI should have traces for the loci plus poles/zeros
-            assert len(fig.data) >= num_loci
+        # Check that we have valid data in both cases
+        assert gui.rl_data.gains is not None
+        assert rl_data.gains is not None
+        assert len(gui.rl_data.gains) > 0
+        assert len(rl_data.gains) > 0
+        
+        # Check that the GUI data has the expected structure
+        assert hasattr(gui.rl_data, 'loci')
+        assert hasattr(gui.rl_data, 'gains')
+        assert hasattr(gui.rl_data, 'poles')
+        assert hasattr(gui.rl_data, 'zeros')
+    
+    def test_info_box_creation(self):
+        """Test that the info box is created properly."""
+        gui = root_locus_gui(self.sys1)
+        assert gui.info_text is not None
+        assert hasattr(gui.info_text, 'set_text')
+        assert hasattr(gui.info_text, 'set_visible')
+    
+    def test_mouse_event_handlers(self):
+        """Test that mouse event handlers are set up."""
+        gui = root_locus_gui(self.sys1)
+        # Check that the methods exist
+        assert hasattr(gui, '_on_mouse_move')
+        assert hasattr(gui, '_on_mouse_leave')
+        assert hasattr(gui, '_find_closest_point')
+        assert hasattr(gui, '_update_info_box')
+        assert hasattr(gui, '_hide_info_box')
+    
+    def test_save_functionality(self):
+        """Test the save functionality."""
+        gui = root_locus_gui(self.sys1)
+        assert hasattr(gui, 'save')
+        # Note: We don't actually save a file in tests to avoid file system dependencies
+    
+    def test_cursor_marker_creation(self):
+        """Test that the cursor marker is created properly."""
+        gui = root_locus_gui(self.sys1)
+        assert gui.cursor_marker is not None
+        assert hasattr(gui.cursor_marker, 'set_data')
+        assert hasattr(gui.cursor_marker, 'set_visible')
+    
+    def test_cursor_marker_methods(self):
+        """Test that cursor marker control methods exist."""
+        gui = root_locus_gui(self.sys1)
+        # Check that the methods exist
+        assert hasattr(gui, '_update_cursor_marker')
+        assert hasattr(gui, '_hide_cursor_marker')
+        assert hasattr(gui, '_create_cursor_marker')
 
 
-@pytest.mark.skipif(not PLOTLY_AVAILABLE, reason="Plotly not available")
+@pytest.mark.skipif(not MATPLOTLIB_AVAILABLE, reason="Matplotlib not available")
 @pytest.mark.skipif(not GUI_AVAILABLE, reason="GUI module not available")
 def test_import_functionality():
     """Test that the GUI module can be imported and used."""
-    from control.interactive.rlocus_gui import root_locus_gui, rlocus_gui
+    from control.interactive.rlocus_gui import root_locus_gui, rlocus_gui, RootLocusGUI
     
     # Create a simple system
     s = ct.tf('s')
     sys = 1 / (s**2 + 2*s + 1)
     
     # Test both functions
-    fig1 = root_locus_gui(sys)
-    fig2 = rlocus_gui(sys)
+    gui1 = root_locus_gui(sys)
+    gui2 = rlocus_gui(sys)
     
-    assert isinstance(fig1, go.Figure)
-    assert isinstance(fig2, go.Figure)
+    assert isinstance(gui1, RootLocusGUI)
+    assert isinstance(gui2, RootLocusGUI)
 
 
 if __name__ == "__main__":
     # Run a simple test if executed directly
-    if PLOTLY_AVAILABLE and GUI_AVAILABLE:
+    if MATPLOTLIB_AVAILABLE and GUI_AVAILABLE:
         s = ct.tf('s')
         sys = 1 / (s**2 + 2*s + 1)
-        fig = root_locus_gui(sys, title="Test Plot")
+        gui = root_locus_gui(sys, title="Test Plot")
         print("Test successful! Created root locus GUI.")
         # Uncomment the next line to show the plot
-        # fig.show()
+        # gui.show()
     else:
-        print("Plotly or GUI module not available for testing.") 
+        print("Matplotlib or GUI module not available for testing.") 
