@@ -91,8 +91,161 @@ class RootLocusGUI:
         self.locus_lines = []
         self.cursor_marker = None
         
+        # Precomputed high-resolution gain table
+        self.gain_table = None
+        self.gain_resolution = 10000  # High resolution for smooth interpolation
+        
         self._create_plot()
         self._setup_interactivity()
+        self._create_gain_table()
+    
+    def _create_gain_table(self):
+        """Create a high-resolution precomputed table of gains and corresponding points."""
+        
+        if self.rl_data.loci is None or len(self.rl_data.gains) == 0:
+            return
+        
+        # Create high-resolution gain array
+        min_gain = np.min(self.rl_data.gains)
+        max_gain = np.max(self.rl_data.gains)
+        
+        # Handle edge cases where min_gain might be zero or very small
+        if min_gain <= 0:
+            min_gain = 1e-6  # Small positive value
+        
+        if max_gain <= min_gain:
+            max_gain = min_gain * 10  # Ensure we have a range
+        
+        # Use log spacing for better resolution at lower gains
+        self.gain_table = {
+            'gains': np.logspace(np.log10(min_gain), np.log10(max_gain), self.gain_resolution),
+            'curves': []  # Store each locus as a separate curve
+        }
+        
+        # Extract each locus as a separate curve for smooth interpolation
+        num_loci = self.rl_data.loci.shape[1]
+        
+        for locus_idx in range(num_loci):
+            curve_points = []
+            curve_gains = []
+            
+            # Extract valid points for this locus
+            for gain_idx, gain in enumerate(self.rl_data.gains):
+                point = self.rl_data.loci[gain_idx, locus_idx]
+                if point is not None and not np.isnan(point):
+                    curve_points.append(point)
+                    curve_gains.append(gain)
+            
+            if len(curve_points) > 3:  # Need at least 4 points for Catmull-Rom
+                self.gain_table['curves'].append({
+                    'points': np.array(curve_points),
+                    'gains': np.array(curve_gains),
+                    'lengths': self._compute_curve_lengths(curve_points)
+                })
+    
+    def _compute_curve_lengths(self, points):
+        """Compute cumulative arc lengths along the curve."""
+        if len(points) < 2:
+            return [0.0]
+        
+        lengths = [0.0]
+        for i in range(1, len(points)):
+            segment_length = abs(points[i] - points[i-1])
+            lengths.append(lengths[-1] + segment_length)
+        
+        return np.array(lengths)
+    
+    def _find_closest_point_high_res(self, x, y):
+        """Find the closest point using curve-following interpolation."""
+        
+        if self.gain_table is None or len(self.gain_table['curves']) == 0:
+            return self._find_closest_point(x, y)
+        
+        target_point = complex(x, y)
+        min_distance = float('inf')
+        best_interpolated_point = None
+        best_interpolated_gain = None
+        
+        # Check each curve
+        for curve in self.gain_table['curves']:
+            points = curve['points']
+            gains = curve['gains']
+            
+            # Find the closest point on this curve
+            distances = np.abs(points - target_point)
+            closest_idx = np.argmin(distances)
+            min_curve_distance = distances[closest_idx]
+            
+            if min_curve_distance < min_distance:
+                min_distance = min_curve_distance
+                
+                # If we're close enough to this curve, interpolate along it
+                if min_curve_distance < 10.0 and len(points) >= 4:
+                    # Find the best interpolation point along the curve
+                    interpolated_point, interpolated_gain = self._interpolate_along_curve(
+                        target_point, points, gains, closest_idx
+                    )
+                    
+                    if interpolated_point is not None:
+                        best_interpolated_point = interpolated_point
+                        best_interpolated_gain = interpolated_gain
+        
+        return best_interpolated_point, best_interpolated_gain
+    
+    def _interpolate_along_curve(self, target_point, points, gains, closest_idx):
+        """Interpolate along a curve using Catmull-Rom splines."""
+        
+        if len(points) < 4:
+            return points[closest_idx], gains[closest_idx]
+        
+        # Find the best segment for interpolation
+        best_t = 0.0
+        best_distance = float('inf')
+        
+        # Try interpolation in different segments around the closest point
+        for start_idx in range(max(0, closest_idx - 2), min(len(points) - 3, closest_idx + 1)):
+            if start_idx + 3 >= len(points):
+                continue
+            
+            # Get 4 consecutive points for Catmull-Rom
+            p0, p1, p2, p3 = points[start_idx:start_idx + 4]
+            g0, g1, g2, g3 = gains[start_idx:start_idx + 4]
+            
+            # Try different interpolation parameters
+            for t in np.linspace(0, 1, 50):  # 50 samples per segment
+                # Interpolate the point
+                interpolated_point = self._catmull_rom_interpolate(t, p0, p1, p2, p3)
+                
+                # Interpolate the gain
+                interpolated_gain = self._catmull_rom_interpolate(t, g0, g1, g2, g3)
+                
+                # Check distance to target
+                distance = abs(interpolated_point - target_point)
+                
+                if distance < best_distance:
+                    best_distance = distance
+                    best_t = t
+                    best_point = interpolated_point
+                    best_gain = interpolated_gain
+        
+        if best_distance < 10.0:
+            return best_point, best_gain
+        
+        return points[closest_idx], gains[closest_idx]
+    
+    def _catmull_rom_interpolate(self, t, y0, y1, y2, y3):
+        """Catmull-Rom spline interpolation between four points."""
+        
+        t2 = t * t
+        t3 = t2 * t
+        
+        # Catmull-Rom coefficients
+        p0 = -0.5 * t3 + t2 - 0.5 * t
+        p1 = 1.5 * t3 - 2.5 * t2 + 1.0
+        p2 = -1.5 * t3 + 2.0 * t2 + 0.5 * t
+        p3 = 0.5 * t3 - 0.5 * t2
+        
+        return y0 * p0 + y1 * p1 + y2 * p2 + y3 * p3
     
     def _create_plot(self):
         """Create the root locus plot."""
@@ -163,7 +316,7 @@ class RootLocusGUI:
             self._hide_cursor_marker()
             return
         
-        closest_point, closest_gain = self._find_closest_point(event.xdata, event.ydata)
+        closest_point, closest_gain = self._find_closest_point_high_res(event.xdata, event.ydata)
         
         if closest_point is not None:
             self._update_info_box(closest_point, closest_gain)
