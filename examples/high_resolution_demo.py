@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-Test script for high-resolution Catmull-Rom interpolation in root locus GUI.
+High-Resolution Root Locus GUI Demo.
 
-This demonstrates the precomputed gain table with 10,000 resolution points
-for ultra-smooth green dot movement.
+This example demonstrates the precomputed gain table with 10,000 resolution points
+and Catmull-Rom spline interpolation for ultra-smooth green dot movement.
 """
 
 import control as ct
 import numpy as np
 
 def main():
-    """Test the high-resolution root locus GUI."""
+    """Demonstrate the high-resolution root locus GUI."""
     
-    print("High-Resolution Root Locus GUI Test")
+    print("High-Resolution Root Locus GUI Demo")
     print("=" * 40)
     
     try:
@@ -48,10 +48,10 @@ def main():
         
         gui.show()
         
-        print("\nTest completed!")
+        print("\nDemo completed!")
         
     except Exception as e:
-        print(f"Error during test: {e}")
+        print(f"Error during demo: {e}")
         import traceback
         traceback.print_exc()
 
